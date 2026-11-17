@@ -502,8 +502,11 @@ function bailar(seg) {
   if (!mudo) { try { musicaBaile.currentTime = INICIO_BAILE; } catch {} musicaBaile.play().catch(() => {}); }
 }
 const teclas = {};
-const esTactil = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
-if (esTactil) $('ayuda').textContent = 'Desliza el dedo en cualquier parte de la pantalla para mover al oso';
+const esTactil = matchMedia('(pointer: coarse)').matches;
+if (esTactil) $('ayuda').textContent = 'Desliza el dedo en la franja de abajo: el oso va justo donde esté tu dedo';
+// En celular dejamos una franja abajo para el dedo, así no tapa al oso
+const PANEL = esTactil ? 110 : 0;
+let SUELO = H - 14 - PANEL;   // línea del piso donde camina el oso
 
 // ---------- Tamaño (pantalla completa en celular) ----------
 function ajustarTamano() {
@@ -514,7 +517,8 @@ function ajustarTamano() {
     H = nuevoH;
     canvas.height = H;
   }
-  oso.y = H - 125;
+  SUELO = H - 14 - PANEL;
+  oso.y = SUELO - 111;
   if (!jugando || pausado) dibujar();
 }
 addEventListener('resize', ajustarTamano);
@@ -529,17 +533,18 @@ function aCanvasX(clientX) {
 function limitar(x) { return Math.max(0, Math.min(W - oso.w, x)); }
 canvas.addEventListener('mousemove', e => { oso.objetivoX = limitar(aCanvasX(e.clientX) - oso.w / 2); });
 
-// Dedo: arrastre relativo, el dedo puede ir en cualquier parte sin tapar al oso
-let toqueInicioX = 0, osoInicioX = 0;
-canvas.addEventListener('touchstart', e => {
-  toqueInicioX = aCanvasX(e.touches[0].clientX);
-  osoInicioX = oso.objetivoX;
-}, { passive: true });
-canvas.addEventListener('touchmove', e => {
+// Dedo: el oso se pone justo encima de donde está el dedo (en cualquier parte de la pantalla)
+let dedoX = null;
+function seguirDedo(e) {
   e.preventDefault();
-  const dx = aCanvasX(e.touches[0].clientX) - toqueInicioX;
-  oso.objetivoX = limitar(osoInicioX + dx * 1.3);   // 1.3 = un poco más sensible
-}, { passive: false });
+  const t = e.touches[0];
+  if (!t) return;
+  dedoX = aCanvasX(t.clientX);
+  oso.objetivoX = limitar(dedoX - oso.w / 2);
+}
+canvas.addEventListener('touchstart', seguirDedo, { passive: false });
+canvas.addEventListener('touchmove', seguirDedo, { passive: false });
+canvas.addEventListener('touchend', () => { dedoX = null; }, { passive: true });
 
 function vibrar(patron) { try { navigator.vibrate && navigator.vibrate(patron); } catch {} }
 
@@ -622,7 +627,7 @@ function crearFresa() {
   fresas.push({
     x: 30 + Math.random() * (W - 60),
     y: -30,
-    vel: (165 + nivel * 235 + Math.random() * 85) * (H / 600),  // px/seg, igual de difícil en pantallas altas
+    vel: (165 + nivel * 235 + Math.random() * 85) * ((SUELO + 14) / 600),  // px/seg: mismo tiempo de caída en cualquier pantalla
     giro: Math.random() * Math.PI,
     zz: zigzag ? (40 + Math.random() * 50) * (Math.random() < 0.5 ? -1 : 1) : 0,   // amplitud del zigzag
     zf: 2 + Math.random() * 2,                                                     // rapidez del zigzag
@@ -664,7 +669,8 @@ function bucle(ahora) {
   if (teclas['ArrowRight'] || teclas['d']) oso.objetivoX += velTeclas;
   oso.objetivoX = Math.max(0, Math.min(W - oso.w, oso.objetivoX));
   const xAntes = oso.x;
-  oso.x += (oso.objetivoX - oso.x) * Math.min(1, dt * 14);
+  // con el dedo sigue casi al instante; con mouse/teclas, suavecito
+  oso.x += (oso.objetivoX - oso.x) * Math.min(1, dt * (esTactil ? 35 : 14));
   animarOso(dt, (oso.x - xAntes) / Math.max(dt, 0.001));
 
   // Fresas
@@ -672,7 +678,9 @@ function bucle(ahora) {
   if (siguienteFresa <= 0) crearFresa();
 
   // Zona de la boca/cuerpo del oso
-  const zona = { x: oso.x + 18, y: oso.y + 20, w: oso.w - 36, h: 60 };
+  // zona donde atrapa: en celular un poco más ancha porque el dedo es menos preciso
+  const margen = esTactil ? 10 : 18;
+  const zona = { x: oso.x + margen, y: oso.y + 20, w: oso.w - margen * 2, h: 60 };
 
   for (let i = fresas.length - 1; i >= 0; i--) {
     const f = fresas[i];
@@ -730,14 +738,14 @@ function bucle(ahora) {
         bailar(3);
       }
       revisarPremios();
-    } else if (f.y > H + 20) {
+    } else if (f.y > SUELO + 20) {
       fresas.splice(i, 1);
       if (f.tipo === 'fresa') {
         racha = 0; comboHasta = 0;
         vidas--;
         oso.triste = 1;
         if (vidas > 0) { sonar('perder'); vibrar(70); }
-        textos.push({ x: f.x, y: H - 20, t: '💔', vida: 0.8 });
+        textos.push({ x: f.x, y: SUELO - 10, t: '💔', vida: 0.8 });
         if (vidas <= 0) { oso.boca = 0; oso.bocado = 0; dibujar(); terminar(); return; }
       }
     }
@@ -806,7 +814,24 @@ function dibujar() {
 
   // Suelo
   ctx.fillStyle = '#2b2b2b';
-  ctx.fillRect(0, H - 14, W, 14);
+  ctx.fillRect(0, SUELO, W, 14);
+
+  // Franja para el dedo (solo celular)
+  if (PANEL) {
+    const py = SUELO + 14;
+    ctx.fillStyle = '#181014';
+    ctx.fillRect(0, py, W, H - py);
+    ctx.fillStyle = 'rgba(255,255,255,.05)';
+    ctx.beginPath(); ctx.roundRect(14, py + 14, W - 28, H - py - 28, 18); ctx.fill();
+    // marcador de dónde está el oso
+    const mx = oso.x + oso.w / 2;
+    ctx.fillStyle = dedoX !== null ? 'rgba(255,209,102,.45)' : 'rgba(186,43,90,.45)';
+    ctx.beginPath(); ctx.arc(mx, py + (H - py) / 2, 22, 0, Math.PI * 2); ctx.fill();
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'rgba(255,255,255,.45)';
+    ctx.font = '14px sans-serif';
+    ctx.fillText('◀   desliza aquí   ▶', W / 2, py + (H - py) / 2);
+  }
 
   // Fresas
   ctx.textAlign = 'center';
@@ -825,7 +850,7 @@ function dibujar() {
   // Sombra
   ctx.fillStyle = 'rgba(0,0,0,.35)';
   ctx.beginPath();
-  ctx.ellipse(oso.x + oso.w / 2, H - 12, 34 - oso.mov * 6, 5, 0, 0, Math.PI * 2);
+  ctx.ellipse(oso.x + oso.w / 2, SUELO + 2, 34 - oso.mov * 6, 5, 0, 0, Math.PI * 2);
   ctx.fill();
 
   dibujarOso();
@@ -931,7 +956,7 @@ function animarOso(dt, vx) {
   // Polvito al correr
   if (oso.mov > 0.7 && Math.random() < 0.3) {
     particulas.push({
-      x: cx - Math.sign(oso.vx) * 25, y: H - 16,
+      x: cx - Math.sign(oso.vx) * 25, y: SUELO - 2,
       vx: -Math.sign(oso.vx) * (30 + Math.random() * 40), vy: -20 - Math.random() * 30,
       vida: 0.4, color: '#6b5a62'
     });
