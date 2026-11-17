@@ -1,0 +1,1119 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#121212">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Oso Fresas">
+<title>Oso Come Fresas</title>
+<style>
+  :root {
+    --rosa: #BA2B5A;
+    --crema: #E5C7AE;
+    --fondo: #121212;
+    --panel: #1e1e1e;
+    --texto: #f5f5f5;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; height: 100dvh; overscroll-behavior: none; }
+  body {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    margin: 0;
+    background: var(--fondo);
+    color: var(--texto);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+    touch-action: none;
+    user-select: none;
+  }
+  #juego {
+    position: relative;
+    width: min(400px, 100vw);
+    aspect-ratio: 2 / 3;
+    max-height: 100vh;
+    background: linear-gradient(#2a1a24, var(--panel) 70%);
+    border-radius: 16px;
+    box-shadow: 0 10px 40px rgba(0,0,0,.5);
+    overflow: hidden;
+  }
+  canvas { display: block; width: 100%; height: 100%; }
+
+  /* Celular: pantalla completa */
+  @media (max-width: 500px), (pointer: coarse) and (max-height: 900px) {
+    #juego {
+      width: 100vw; height: 100vh; height: 100dvh;
+      aspect-ratio: auto; max-height: none;
+      border-radius: 0; box-shadow: none;
+    }
+  }
+
+  .pantalla {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    justify-content: center; align-items: center;
+    text-align: center; padding: 24px;
+    background: rgba(18,18,18,.88);
+    gap: 10px;
+  }
+  .oculto { display: none; }
+  h1 { margin: 0; font-size: 2rem; line-height: 1.2; }
+  .sub { color: #b0b0b0; margin: 0 0 8px; }
+  .record { color: var(--crema); font-size: 1.1rem; margin: 0; }
+  .nuevo {
+    color: #ffd166; font-weight: 800; font-size: 1.3rem; margin: 0;
+    animation: latido .6s ease-in-out infinite alternate;
+  }
+  @keyframes latido { to { transform: scale(1.12); } }
+  .big { font-size: 3.2rem; font-weight: 800; margin: 0; color: var(--rosa); }
+  button {
+    margin-top: 14px;
+    font: 600 1.15rem inherit;
+    font-family: inherit;
+    padding: 14px 34px;
+    border: none; border-radius: 30px;
+    background: var(--rosa); color: #fff;
+    cursor: pointer; transition: transform .15s;
+  }
+  button:hover { transform: scale(1.06); }
+  .ayuda { color: #777; font-size: .85rem; margin-top: 12px; }
+  .oso-mini { width: 90px; height: auto; }
+  .mensaje-fin { margin: 0 0 4px; color: #ff8fab; font-size: 1.05rem; font-weight: 600; }
+  .dedicatoria {
+    position: absolute; left: 0; right: 0; bottom: 14px; margin: 0;
+    font-size: .9rem; color: #E5C7AE; opacity: .85; font-style: italic;
+  }
+  .btn-icono {
+    position: absolute; top: 46px; z-index: 5;
+    width: 44px; height: 44px;
+    margin: 0; padding: 0; font-size: 1.25rem; line-height: 44px;
+    background: rgba(255,255,255,.1); border-radius: 12px;
+  }
+  .btn-icono:hover { transform: none; }
+  .btn-icono:active { transform: scale(.9); }
+  #btnSonido { right: 10px; }
+  #btnPausa { right: 62px; }
+
+  /* Lista de premios en inicio / fin */
+  .premios {
+    display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;
+    margin: 6px 0 0; padding: 0; list-style: none;
+  }
+  .premios li {
+    background: rgba(255,255,255,.07); border-radius: 12px;
+    padding: 8px 10px; font-size: .85rem; color: #ddd; min-width: 88px;
+  }
+  .premios li b { display: block; font-size: 1.6rem; }
+  .premios li.ganado { background: rgba(255,209,102,.18); color: #ffd166; }
+
+  /* Popup de premio */
+  #premio {
+    position: absolute; inset: 0; z-index: 20;
+    display: flex; justify-content: center; align-items: center;
+    background: radial-gradient(circle at 50% 45%, rgba(186,43,90,.55), rgba(10,6,10,.92) 70%);
+    padding: 20px;
+  }
+  #premio.oculto { display: none; }
+  .tarjeta {
+    position: relative; width: 100%; max-width: 320px;
+    background: linear-gradient(160deg, #fff7f0, #ffe3ec);
+    color: #3a0d1f; border-radius: 26px;
+    padding: 30px 22px 24px; text-align: center;
+    box-shadow: 0 20px 60px rgba(0,0,0,.55), 0 0 0 4px #ffd166 inset;
+    animation: aparecer .6s cubic-bezier(.2,1.6,.4,1) both;
+  }
+  @keyframes aparecer { from { transform: scale(.3) rotate(-8deg); opacity: 0; } to { transform: scale(1) rotate(0); opacity: 1; } }
+  .rayos {
+    position: absolute; left: 50%; top: 70px; width: 260px; height: 260px;
+    margin: -130px 0 0 -130px; border-radius: 50%; pointer-events: none;
+    background: repeating-conic-gradient(rgba(255,209,102,.55) 0 10deg, transparent 10deg 20deg);
+    -webkit-mask: radial-gradient(circle, #000 20%, transparent 68%);
+            mask: radial-gradient(circle, #000 20%, transparent 68%);
+    animation: girar 8s linear infinite;
+  }
+  @keyframes girar { to { transform: rotate(360deg); } }
+  .premio-emoji {
+    position: relative; font-size: 5.2rem; line-height: 1; margin: 0 0 6px;
+    animation: brinco 1s ease-in-out infinite;
+    filter: drop-shadow(0 6px 10px rgba(0,0,0,.25));
+  }
+  @keyframes brinco { 0%,100% { transform: translateY(0) rotate(-6deg); } 50% { transform: translateY(-10px) rotate(6deg); } }
+  .premio-ganaste {
+    position: relative; margin: 6px 0 2px; font-size: 2.2rem; font-weight: 900;
+    letter-spacing: 1px; color: var(--rosa);
+    text-shadow: 2px 2px 0 #ffd166;
+  }
+  .premio-nombre { position: relative; margin: 0; font-size: 1.35rem; font-weight: 700; }
+  .premio-meta { margin: 8px 0 0; font-size: .9rem; color: #7a4a5a; }
+  .premio-captura {
+    margin: 14px 0 0; padding: 10px; border-radius: 14px;
+    background: rgba(186,43,90,.1); border: 2px dashed rgba(186,43,90,.45);
+    font-size: .85rem; color: #5a2338;
+  }
+  .premio-captura b { display: block; font-size: 1rem; letter-spacing: 2px; color: var(--rosa); margin-top: 2px; }
+  #btnPremio { margin-top: 16px; width: 100%; box-shadow: 0 6px 0 #7d1a3b; }
+  #btnPremio:active { transform: translateY(4px); box-shadow: 0 2px 0 #7d1a3b; }
+  #confeti { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 25; }
+</style>
+</head>
+<body>
+
+<div id="juego">
+  <canvas id="lienzo" width="400" height="600"></canvas>
+  <button id="btnSonido" class="btn-icono" title="Sonido" aria-label="Sonido">🔊</button>
+  <button id="btnPausa" class="btn-icono oculto" title="Pausa" aria-label="Pausa">⏸</button>
+
+  <div id="pausa" class="pantalla oculto">
+    <h1>Pausa ⏸</h1>
+    <p class="sub">El oso te espera 🐻</p>
+    <button id="btnSeguir">Seguir</button>
+  </div>
+
+  <div id="premio" class="oculto" role="dialog" aria-modal="true" aria-labelledby="premioNombre">
+    <div class="tarjeta">
+      <div class="rayos"></div>
+      <p class="premio-emoji" id="premioEmoji">☕</p>
+      <p class="premio-ganaste">¡GANASTE!</p>
+      <p class="premio-nombre" id="premioNombre">Un café</p>
+      <p class="premio-meta" id="premioMeta">Por comer 15 fresas 🍓</p>
+      <div class="premio-captura">📸 Toma captura de pantalla para reclamarlo
+        <b id="premioCodigo">OSO-0000</b>
+        <span id="premioFecha"></span>
+      </div>
+      <button id="btnPremio">¡Seguir jugando! 🐻</button>
+    </div>
+  </div>
+  <canvas id="confeti"></canvas>
+
+  <div id="inicio" class="pantalla">
+    <img class="oso-mini" id="osoMini" alt="Oso">
+    <h1>Oso Come Fresas 🍓</h1>
+    <p class="sub">Atrapa las fresas 🍓, ¡ojo con el brócoli 🥦!<br>Los ❤️ te regresan vidas. Si pierdes 3, se acaba.</p>
+    <p class="record">🏆 Récord: <span id="recordInicio">0</span></p>
+    <p class="sub" style="margin:10px 0 0">🎁 ¡Gana premios reales!</p>
+    <ul class="premios" id="listaPremiosInicio"></ul>
+    <button id="btnJugar">Jugar</button>
+    <p class="ayuda" id="ayuda">Mueve el oso con el mouse o las flechas ← →</p>
+    <p class="dedicatoria">Hecho con &lt;3, para cuando esté aburrida J.xmin 💕</p>
+  </div>
+
+  <div id="fin" class="pantalla oculto">
+    <h1>¡Fin del juego!</h1>
+    <p class="mensaje-fin" id="mensajeFin"></p>
+    <p class="sub">Fresas comidas</p>
+    <p class="big" id="puntosFin">0</p>
+    <p class="nuevo oculto" id="nuevoRecord">¡NUEVO RÉCORD! 🎉</p>
+    <p class="record">🏆 Récord: <span id="recordFin">0</span></p>
+    <ul class="premios" id="listaPremiosFin"></ul>
+    <p class="dedicatoria">Hecho con &lt;3, para cuando esté aburrida J.xmin 💕</p>
+    <button id="btnOtra">Jugar otra vez</button>
+  </div>
+</div>
+
+<script>
+// ---------- Oso (tu SVG) ----------
+const OSO_SVG = `<svg viewBox="0 0 400 500" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="130" cy="120" r="35" fill="#BA2B5A" stroke="#4a1f33" stroke-width="4"/>
+  <circle cx="270" cy="120" r="35" fill="#BA2B5A" stroke="#4a1f33" stroke-width="4"/>
+  <ellipse cx="90" cy="280" rx="35" ry="90" transform="rotate(35 90 280)" fill="#BA2B5A" stroke="#4a1f33" stroke-width="4"/>
+  <ellipse cx="310" cy="280" rx="35" ry="90" transform="rotate(-35 310 280)" fill="#BA2B5A" stroke="#4a1f33" stroke-width="4"/>
+  <ellipse cx="60" cy="330" rx="20" ry="30" transform="rotate(20 60 330)" fill="#E5C7AE" stroke="#4a1f33" stroke-width="3"/>
+  <ellipse cx="340" cy="330" rx="20" ry="30" transform="rotate(-20 340 330)" fill="#E5C7AE" stroke="#4a1f33" stroke-width="3"/>
+  <circle cx="140" cy="390" r="50" fill="#BA2B5A" stroke="#4a1f33" stroke-width="4"/>
+  <circle cx="260" cy="390" r="50" fill="#BA2B5A" stroke="#4a1f33" stroke-width="4"/>
+  <ellipse cx="140" cy="395" rx="30" ry="20" fill="#E5C7AE" stroke="#4a1f33" stroke-width="3"/>
+  <ellipse cx="200" cy="290" rx="110" ry="120" fill="#BA2B5A" stroke="#4a1f33" stroke-width="4"/>
+  <ellipse cx="200" cy="310" rx="80" ry="90" fill="#E5C7AE" stroke="#4a1f33" stroke-width="3"/>
+  <ellipse cx="200" cy="190" rx="120" ry="100" fill="#BA2B5A" stroke="#4a1f33" stroke-width="4"/>
+  <path d="M 128 132 Q 148 118 168 128" fill="none" stroke="#371B33" stroke-width="7" stroke-linecap="round"/>
+  <path d="M 272 132 Q 252 118 232 128" fill="none" stroke="#371B33" stroke-width="7" stroke-linecap="round"/>
+  <ellipse cx="200" cy="225" rx="85" ry="65" fill="#E5C7AE" stroke="#4a1f33" stroke-width="3"/>
+  <ellipse cx="110" cy="214" rx="20" ry="12" fill="rgba(255,110,150,.55)"/>
+  <ellipse cx="290" cy="214" rx="20" ry="12" fill="rgba(255,110,150,.55)"/>
+  <ellipse cx="200" cy="204" rx="36" ry="24" fill="#4B1E3F" stroke="#4a1f33" stroke-width="3"/>
+  <ellipse cx="188" cy="197" rx="10" ry="5" transform="rotate(-17 188 197)" fill="rgba(255,255,255,.35)"/>
+  <ellipse cx="152" cy="166" rx="19" ry="21" fill="#fff" stroke="#4a1f33" stroke-width="3"/>
+  <ellipse cx="152" cy="168" rx="14" ry="16" fill="#2a0f1c"/>
+  <circle cx="147" cy="161" r="5.5" fill="#fff"/>
+  <circle cx="157" cy="174" r="2.5" fill="#fff"/>
+  <ellipse cx="248" cy="166" rx="19" ry="21" fill="#fff" stroke="#4a1f33" stroke-width="3"/>
+  <ellipse cx="248" cy="168" rx="14" ry="16" fill="#2a0f1c"/>
+  <circle cx="243" cy="161" r="5.5" fill="#fff"/>
+  <circle cx="253" cy="174" r="2.5" fill="#fff"/>
+  <path d="M 150 240 Q 200 300 250 240" fill="none" stroke="#4a1f33" stroke-width="4"/>
+  <path d="M 165 255 Q 200 280 235 255" fill="#BA2B5A" stroke="#4a1f33" stroke-width="3"/>
+</svg>`;
+const osoURL = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(OSO_SVG);
+const osoImg = new Image();
+osoImg.src = osoURL;
+document.getElementById('osoMini').src = osoURL;
+
+// ---------- Récord en memoria (localStorage) ----------
+const CLAVE_RECORD = 'osoFresas.record';
+function leerRecord() {
+  try { return parseInt(localStorage.getItem(CLAVE_RECORD), 10) || 0; } catch { return 0; }
+}
+function guardarRecord(v) {
+  try { localStorage.setItem(CLAVE_RECORD, String(v)); } catch {}
+}
+let record = leerRecord();
+
+// Para navegadores viejos sin roundRect
+if (!CanvasRenderingContext2D.prototype.roundRect) {
+  CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h) { this.rect(x, y, w, h); };
+}
+
+// ---------- Premios ----------
+// Cambia aquí las metas o los premios cuando quieras
+const PREMIOS = [
+  { id: 'cafe',    meta: 50, emoji: '☕',   nombre: 'Un café',                corto: 'Café' },
+  { id: 'cerveza', meta: 75, emoji: '🍺',   nombre: 'Una cerveza',            corto: 'Cerveza' },
+  { id: 'cine',    meta: 95, emoji: '🎬🍿', nombre: 'Boletos para el cine',   corto: 'Cine' }
+];
+const CLAVE_PREMIOS = 'osoFresas.premios';
+let ganados = {};   // { cafe: { codigo, fecha } }
+try { ganados = JSON.parse(localStorage.getItem(CLAVE_PREMIOS)) || {}; } catch { ganados = {}; }
+// Abrir con ?reiniciar al final de la dirección borra premios y récord (para tus pruebas)
+if (/[?&]reiniciar/.test(location.search)) {
+  ganados = {}; record = 0;
+  try { localStorage.removeItem(CLAVE_PREMIOS); localStorage.removeItem('osoFresas.record'); } catch {}
+}
+function guardarPremios() { try { localStorage.setItem(CLAVE_PREMIOS, JSON.stringify(ganados)); } catch {} }
+let premiosPartida = [], premioAbierto = false;
+
+function siguientePremio() { return PREMIOS.find(p => !ganados[p.id]); }
+
+function pintarListaPremios(idLista) {
+  const ul = document.getElementById(idLista);
+  if (!ul) return;
+  ul.innerHTML = PREMIOS.map(p => {
+    const g = ganados[p.id];
+    return `<li class="${g ? 'ganado' : ''}"><b>${p.emoji}</b>${p.corto}<br>${g ? '✅ ¡Ganado!' : p.meta + ' 🍓'}</li>`;
+  }).join('');
+}
+
+function revisarPremios() {
+  const p = siguientePremio();
+  if (!p || puntos < p.meta || premioAbierto) return;
+  const codigo = 'OSO-' + Math.random().toString(36).slice(2, 6).toUpperCase();
+  const fecha = new Date().toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' });
+  ganados[p.id] = { codigo, fecha };
+  guardarPremios();
+  premiosPartida.push(p.id);
+  mostrarPremio(p);
+}
+
+function mostrarPremio(p) {
+  premioAbierto = true;
+  pausado = true;                       // congela el juego mientras se ve el premio
+  musicaOff(false);
+  sonar('premio');
+  vibrar([60, 40, 60, 40, 160]);
+  const g = ganados[p.id];
+  $('premioEmoji').textContent = p.emoji;
+  $('premioNombre').textContent = p.nombre;
+  $('premioMeta').textContent = `Por comer ${p.meta} fresas 🍓`;
+  $('premioCodigo').textContent = g.codigo;
+  $('premioFecha').textContent = g.fecha;
+  // reinicia la animación de entrada
+  const t = document.querySelector('#premio .tarjeta');
+  t.style.animation = 'none'; void t.offsetWidth; t.style.animation = '';
+  $('premio').classList.remove('oculto');
+  lanzarConfeti();
+  setTimeout(() => { if (premioAbierto) lanzarConfeti(true); }, 900);
+}
+
+function cerrarPremio() {
+  if (!premioAbierto) return;
+  premioAbierto = false;
+  $('premio').classList.add('oculto');
+  pausado = false;
+  ultimo = performance.now();
+  if (jugando) {
+    // festeja bailando y luego sigue el juego
+    textos.push({ x: W / 2, y: H * 0.42, t: '¡A seguir! 🐻', vida: 2.5, grande: true });
+    bailar(2.5);
+  }
+}
+
+// ---------- Confeti ----------
+const confetiCanvas = document.getElementById('confeti');
+const cctx = confetiCanvas.getContext('2d');
+let confeti = [], confetiActivo = false;
+const COLORES = ['#ffd166', '#ff4d6d', '#BA2B5A', '#06d6a0', '#4cc9f0', '#ffffff', '#f72585', '#E5C7AE'];
+
+function lanzarConfeti(lluvia) {
+  const r = confetiCanvas.getBoundingClientRect();
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  confetiCanvas.width = r.width * dpr; confetiCanvas.height = r.height * dpr;
+  cctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const w = r.width, h = r.height;
+  const n = lluvia ? 90 : 170;
+  for (let i = 0; i < n; i++) {
+    let x, y, vx, vy;
+    if (lluvia) {                       // lluvia desde arriba
+      x = Math.random() * w; y = -20 - Math.random() * h * 0.5;
+      vx = (Math.random() - 0.5) * 60; vy = 60 + Math.random() * 120;
+    } else {                            // cañones desde las esquinas de abajo
+      const izq = i % 2 === 0;
+      x = izq ? 0 : w; y = h * 0.85;
+      const ang = (izq ? -1 : -1) * (Math.PI / 2) + (izq ? 0.35 : -0.35) + (Math.random() - 0.5) * 0.7;
+      const v = 520 + Math.random() * 420;
+      vx = Math.cos(ang) * v * (izq ? 1 : 1); vy = Math.sin(ang) * v;
+      if (!izq) vx = -Math.abs(vx); else vx = Math.abs(vx);
+    }
+    confeti.push({
+      x, y, vx, vy,
+      w: 6 + Math.random() * 6, h: 10 + Math.random() * 8,
+      rot: Math.random() * Math.PI, vr: (Math.random() - 0.5) * 12,
+      osc: Math.random() * Math.PI * 2,
+      color: COLORES[(Math.random() * COLORES.length) | 0],
+      forma: Math.random() < 0.25 ? 'circulo' : (Math.random() < 0.15 ? 'fresa' : 'papel'),
+      vida: 4 + Math.random() * 2
+    });
+  }
+  if (!confetiActivo) { confetiActivo = true; let u = performance.now(); requestAnimationFrame(function paso(a) {
+    const dt = Math.min((a - u) / 1000, 0.05); u = a;
+    cctx.clearRect(0, 0, w, h);
+    for (let i = confeti.length - 1; i >= 0; i--) {
+      const c = confeti[i];
+      c.vx *= 0.985; c.vy = c.vy * 0.985 + 520 * dt;
+      if (c.vy > 260) c.vy = 260;                 // cae flotando
+      c.osc += dt * 6;
+      c.x += (c.vx + Math.sin(c.osc) * 30) * dt; c.y += c.vy * dt;
+      c.rot += c.vr * dt; c.vida -= dt;
+      if (c.vida <= 0 || c.y > h + 30) { confeti.splice(i, 1); continue; }
+      cctx.save();
+      cctx.globalAlpha = Math.min(1, c.vida);
+      cctx.translate(c.x, c.y); cctx.rotate(c.rot);
+      if (c.forma === 'fresa') { cctx.font = '18px sans-serif'; cctx.fillText('🍓', -9, 6); }
+      else if (c.forma === 'circulo') { cctx.fillStyle = c.color; cctx.beginPath(); cctx.arc(0, 0, c.w / 2, 0, Math.PI * 2); cctx.fill(); }
+      else { cctx.fillStyle = c.color; cctx.scale(1, Math.cos(c.osc)); cctx.fillRect(-c.w / 2, -c.h / 2, c.w, c.h); }
+      cctx.restore();
+    }
+    if (confeti.length) requestAnimationFrame(paso);
+    else { confetiActivo = false; cctx.clearRect(0, 0, w, h); }
+  }); }
+}
+
+// ---------- Sonido ----------
+const CLAVE_MUDO = 'osoFresas.mudo';
+let mudo = false;
+try { mudo = localStorage.getItem(CLAVE_MUDO) === '1'; } catch {}
+const musica = new Audio('audio/musica.mp3');
+musica.loop = true;
+musica.volume = 0.35;
+// nombre: [archivo, volumen, segundos máximos]
+const EFECTOS = {
+  comer:    ['audio/comer.mp3',    0.8, 0.6],
+  dorada:   ['audio/dorada.mp3',   0.8, 1.2],
+  perder:   ['audio/perder.mp3',   0.6, 0.8],
+  record:   ['audio/record.mp3',   0.9, 2],
+  gameover: ['audio/gameover.mp3', 0.8, 4],
+  jugar:    ['audio/jugar.mp3',    0.7, 1.5],
+  premio:   ['audio/premio.mp3',   0.9, 5]
+};
+const baseEfectos = {};
+for (const k in EFECTOS) { baseEfectos[k] = new Audio(EFECTOS[k][0]); baseEfectos[k].preload = 'auto'; }
+function sonar(nombre) {
+  if (mudo) return;
+  const [, vol, max] = EFECTOS[nombre];
+  const a = baseEfectos[nombre].cloneNode();   // permite que se encimen
+  a.volume = vol;
+  a.play().catch(() => {});
+  setTimeout(() => a.pause(), max * 1000);
+}
+function musicaOn() {
+  if (mudo) return;
+  if (oso.baile > 0) musicaBaile.play().catch(() => {});
+  else musica.play().catch(() => {});
+}
+function musicaOff(reiniciar) {
+  musica.pause();
+  musicaBaile.pause();
+  if (reiniciar) musica.currentTime = 0;
+}
+function pintarBotonSonido() { document.getElementById('btnSonido').textContent = mudo ? '🔇' : '🔊'; }
+
+// ---------- Elementos ----------
+const canvas = document.getElementById('lienzo');
+const ctx = canvas.getContext('2d');
+const W = canvas.width;
+let H = canvas.height;   // en celular se ajusta a lo alto de la pantalla
+const $ = id => document.getElementById(id);
+$('recordInicio').textContent = record;
+
+// ---------- Estado ----------
+const oso = {
+  w: 90, h: 112, x: W / 2 - 45, y: H - 125, objetivoX: W / 2 - 45,
+  bocado: 0,          // 1 justo al comer, baja a 0
+  vx: 0, mov: 0,      // velocidad y cuánto está caminando (0..1)
+  fase: 0,            // ciclo de pasos
+  inclinacion: 0,
+  boca: 0,            // 0 cerrada, 1 abierta
+  triste: 0,          // 1 cuando se le cae una fresa
+  asco: 0,            // 1 cuando se come un brócoli
+  baile: 0,           // segundos que le quedan bailando
+  globo: null,        // globito de texto { texto, vida }
+  parpadeo: 0, siguienteParpadeo: 2,
+  mirarX: 0, mirarY: 0,
+  t: 0
+};
+let fresas = [], particulas = [], textos = [];
+let puntos = 0, vidas = 3, jugando = false, tiempo = 0, siguienteFresa = 0, ultimo = 0;
+let superoRecord = false, pausado = false;
+let racha = 0, comboHasta = 0;          // combo: 20 fresas seguidas = x2 por 3 s
+let reloj = 0;                          // tiempo para animar el fondo
+const EMOJI_TIPO = { fresa: '🍓', dorada: '🍓', corazon: '❤️', brocoli: '🥦' };
+const NAM = ['¡Ñam!', '¡Rico!', '¡Mmm!', '¡Más!', '🍓❤️', '¡Delish!'];
+
+// Fondo: estrellas y nubes
+const ESTRELLAS = Array.from({ length: 45 }, () => ({
+  x: Math.random() * 400, y: Math.random() * 0.7, r: 0.6 + Math.random() * 1.4, f: Math.random() * 6
+}));
+const NUBES = Array.from({ length: 4 }, (_, i) => ({
+  x: Math.random() * 500, y: 0.12 + i * 0.13, s: 0.7 + Math.random() * 0.6, v: 6 + Math.random() * 8
+}));
+
+// Mensajitos al perder (sale uno al azar). TEMPORALES: cámbialos por los tuyos
+const MENSAJES_FIN = [
+  '¡Casi! El oso cree en ti 🐻',
+  'Otra y ya… (mentira, otras 10) 😜',
+  'Las fresas te extrañan 🍓',
+  'Eres mejor que el brócoli 🥦',
+  'El oso quiere la revancha 💪',
+  'Respira, sonríe y otra vez 💕'
+];
+
+function decir(texto) { oso.globo = { texto, vida: 1 }; }
+
+// Bailecito con música (récord y después de cada premio)
+const INICIO_BAILE = 0;   // segundo de la canción donde empieza el baile
+const musicaBaile = new Audio('audio/baile.mp3');
+musicaBaile.volume = 0.6;
+function bailar(seg) {
+  oso.baile = seg;
+  musica.pause();
+  if (!mudo) { try { musicaBaile.currentTime = INICIO_BAILE; } catch {} musicaBaile.play().catch(() => {}); }
+}
+const teclas = {};
+const esTactil = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
+if (esTactil) $('ayuda').textContent = 'Desliza el dedo en cualquier parte de la pantalla para mover al oso';
+
+// ---------- Tamaño (pantalla completa en celular) ----------
+function ajustarTamano() {
+  const r = $('juego').getBoundingClientRect();
+  if (!r.width || !r.height) return;
+  const nuevoH = Math.round(Math.max(520, Math.min(960, W * r.height / r.width)));
+  if (nuevoH !== H) {
+    H = nuevoH;
+    canvas.height = H;
+  }
+  oso.y = H - 125;
+  if (!jugando || pausado) dibujar();
+}
+addEventListener('resize', ajustarTamano);
+addEventListener('orientationchange', () => setTimeout(ajustarTamano, 200));
+
+// ---------- Controles ----------
+// Mouse: el oso va a donde está el puntero
+function aCanvasX(clientX) {
+  const r = canvas.getBoundingClientRect();
+  return (clientX - r.left) * (W / r.width);
+}
+function limitar(x) { return Math.max(0, Math.min(W - oso.w, x)); }
+canvas.addEventListener('mousemove', e => { oso.objetivoX = limitar(aCanvasX(e.clientX) - oso.w / 2); });
+
+// Dedo: arrastre relativo, el dedo puede ir en cualquier parte sin tapar al oso
+let toqueInicioX = 0, osoInicioX = 0;
+canvas.addEventListener('touchstart', e => {
+  toqueInicioX = aCanvasX(e.touches[0].clientX);
+  osoInicioX = oso.objetivoX;
+}, { passive: true });
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  const dx = aCanvasX(e.touches[0].clientX) - toqueInicioX;
+  oso.objetivoX = limitar(osoInicioX + dx * 1.3);   // 1.3 = un poco más sensible
+}, { passive: false });
+
+function vibrar(patron) { try { navigator.vibrate && navigator.vibrate(patron); } catch {} }
+
+// ---------- Pausa ----------
+function pausar() {
+  if (!jugando || pausado) return;
+  pausado = true;
+  musicaOff(false);
+  $('pausa').classList.remove('oculto');
+}
+function seguir() {
+  if (!pausado || premioAbierto) return;
+  pausado = false;
+  $('pausa').classList.add('oculto');
+  musicaOn();
+  ultimo = performance.now();
+}
+document.addEventListener('visibilitychange', () => { if (document.hidden) pausar(); });
+addEventListener('blur', pausar);
+addEventListener('keydown', e => { teclas[e.key] = true; });
+addEventListener('keyup', e => { teclas[e.key] = false; });
+
+// ---------- Juego ----------
+function iniciar() {
+  fresas = []; particulas = []; textos = [];
+  puntos = 0; vidas = 3; tiempo = 0; siguienteFresa = 0;
+  superoRecord = false; pausado = false; premiosPartida = [];
+  racha = 0; comboHasta = 0;
+  oso.baile = 0; oso.asco = 0; oso.triste = 0; oso.globo = null;
+  musicaBaile.pause();
+  $('mensajeFin').textContent = '';
+  premioAbierto = false; $('premio').classList.add('oculto');
+  ajustarTamano();
+  oso.x = oso.objetivoX = W / 2 - oso.w / 2;
+  $('inicio').classList.add('oculto');
+  $('fin').classList.add('oculto');
+  $('pausa').classList.add('oculto');
+  $('btnPausa').classList.remove('oculto');
+  sonar('jugar');
+  musicaOff(true);
+  musicaOn();
+  jugando = true;
+  ultimo = performance.now();
+  requestAnimationFrame(bucle);
+}
+
+function terminar() {
+  jugando = false;
+  musicaOff(false);
+  vibrar([120, 60, 120]);
+  $('btnPausa').classList.add('oculto');
+  if (puntos > record) { record = puntos; guardarRecord(record); superoRecord = true; }
+  oso.baile = 0;
+  sonar('gameover');
+  if (superoRecord) setTimeout(() => sonar('record'), 1600);
+  $('mensajeFin').textContent = MENSAJES_FIN[(Math.random() * MENSAJES_FIN.length) | 0];
+  $('puntosFin').textContent = puntos;
+  $('recordFin').textContent = record;
+  $('recordInicio').textContent = record;
+  $('nuevoRecord').classList.toggle('oculto', !superoRecord);
+  pintarListaPremios('listaPremiosFin');
+  pintarListaPremios('listaPremiosInicio');
+  const sig = siguientePremio();
+  $('btnOtra').textContent = sig ? `Jugar otra vez · ${sig.emoji} a ${sig.meta}` : 'Jugar otra vez';
+  $('fin').classList.remove('oculto');
+}
+
+function crearFresa() {
+  // dificultad: sube rápido el primer minuto y luego sigue subiendo más lento hasta los ~2.5 min
+  // DIFICULTAD: llega al nivel 1 a los 52 s y sigue subiendo hasta los ~2 min
+  const nivel = Math.min(tiempo / 52, 1) + Math.min(Math.max(tiempo - 52, 0) / 80, 0.7);
+  // qué cae: fresa normal, dorada (+5), corazón (vida extra) o brócoli (quita vida)
+  const r = Math.random();
+  let tipo = 'fresa';
+  if (r < 0.06) tipo = 'dorada';
+  else if (vidas < 3 && r < 0.09) tipo = 'corazon';
+  else if (tiempo > 10 && r > 1 - (0.05 + Math.min(nivel, 1.7) * 0.05)) tipo = 'brocoli';
+  // desde los 35 s algunas caen en zigzag
+  const zigzag = tiempo > 35 && Math.random() < Math.min(0.1 + (tiempo - 35) / 150, 0.35);
+  fresas.push({
+    x: 30 + Math.random() * (W - 60),
+    y: -30,
+    vel: (165 + nivel * 235 + Math.random() * 85) * (H / 600),  // px/seg, igual de difícil en pantallas altas
+    giro: Math.random() * Math.PI,
+    zz: zigzag ? (40 + Math.random() * 50) * (Math.random() < 0.5 ? -1 : 1) : 0,   // amplitud del zigzag
+    zf: 2 + Math.random() * 2,                                                     // rapidez del zigzag
+    tipo
+  });
+  siguienteFresa = Math.max(0.3, 0.85 - nivel * 0.47 + Math.random() * 0.3);
+}
+
+function explotar(x, y, color) {
+  for (let i = 0; i < 10; i++) {
+    const a = Math.random() * Math.PI * 2, v = 60 + Math.random() * 120;
+    particulas.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 60, vida: 0.6, color });
+  }
+}
+
+function bucle(ahora) {
+  if (!jugando) return;
+  if (pausado) { ultimo = ahora; requestAnimationFrame(bucle); return; }
+  const dt = Math.min((ahora - ultimo) / 1000, 0.05);
+  ultimo = ahora;
+  reloj += dt;
+
+  // Bailecito: el juego se congela unos segundos mientras el oso festeja
+  if (oso.baile > 0) {
+    oso.baile -= dt;
+    animarOso(dt, 0);
+    actualizarEfectos(dt);
+    dibujar();
+    if (oso.baile <= 0) { oso.baile = 0; musicaBaile.pause(); musicaOn(); }
+    requestAnimationFrame(bucle);
+    return;
+  }
+
+  tiempo += dt;
+
+  // Movimiento del oso (teclado o seguir el puntero suavemente)
+  const velTeclas = 420 * dt;
+  if (teclas['ArrowLeft'] || teclas['a']) oso.objetivoX -= velTeclas;
+  if (teclas['ArrowRight'] || teclas['d']) oso.objetivoX += velTeclas;
+  oso.objetivoX = Math.max(0, Math.min(W - oso.w, oso.objetivoX));
+  const xAntes = oso.x;
+  oso.x += (oso.objetivoX - oso.x) * Math.min(1, dt * 14);
+  animarOso(dt, (oso.x - xAntes) / Math.max(dt, 0.001));
+
+  // Fresas
+  siguienteFresa -= dt;
+  if (siguienteFresa <= 0) crearFresa();
+
+  // Zona de la boca/cuerpo del oso
+  const zona = { x: oso.x + 18, y: oso.y + 20, w: oso.w - 36, h: 60 };
+
+  for (let i = fresas.length - 1; i >= 0; i--) {
+    const f = fresas[i];
+    f.y += f.vel * dt;
+    f.giro += dt * 2;
+    if (f.zz) {
+      f.x += Math.cos(f.giro * f.zf) * f.zz * f.zf * dt * 0.5;
+      if (f.x < 18 || f.x > W - 18) { f.zz = -f.zz; f.x = Math.max(18, Math.min(W - 18, f.x)); }
+    }
+    if (f.x > zona.x && f.x < zona.x + zona.w && f.y + 14 > zona.y && f.y - 14 < zona.y + zona.h) {
+      fresas.splice(i, 1);
+
+      // 🥦 Brócoli: quita una vida
+      if (f.tipo === 'brocoli') {
+        vidas--; racha = 0; comboHasta = 0;
+        oso.asco = 1; oso.bocado = 0;
+        sonar('perder'); vibrar(90);
+        decir('¡Guácala! 🤢');
+        explotar(f.x, f.y, '#5cb85c');
+        textos.push({ x: f.x, y: f.y, t: '💔', vida: 0.8 });
+        if (vidas <= 0) { oso.boca = 0; dibujar(); terminar(); return; }
+        continue;
+      }
+
+      // ❤️ Corazón: regresa una vida
+      if (f.tipo === 'corazon') {
+        vidas = Math.min(3, vidas + 1);
+        oso.bocado = 1;
+        sonar('jugar');
+        decir('¡Gracias! 💕');
+        explotar(f.x, f.y, '#ff4d6d');
+        textos.push({ x: f.x, y: f.y, t: '+❤️', vida: 1 });
+        continue;
+      }
+
+      // 🍓 Fresa: suma puntos (doble si hay combo)
+      racha++;
+      if (tiempo >= comboHasta && racha >= 20) {
+        comboHasta = tiempo + 3; racha = 0;
+        sonar('record');
+        textos.push({ x: W / 2, y: H * 0.42, t: '¡Combo x2! 🔥', vida: 1.3, grande: true });
+      }
+      const combo = tiempo < comboHasta;
+      const valor = f.tipo === 'dorada' ? 5 : (combo ? 2 : 1);
+      puntos += valor;
+      oso.bocado = 1;
+      sonar(f.tipo === 'dorada' ? 'dorada' : 'comer');
+      if (f.tipo === 'dorada') decir('¡Wow! ✨');
+      else if (Math.random() < 0.3) decir(NAM[(Math.random() * NAM.length) | 0]);
+      explotar(f.x, f.y, f.tipo === 'dorada' ? '#ffd166' : '#ff4d6d');
+      textos.push({ x: f.x, y: f.y, t: '+' + valor, vida: 0.8 });
+      if (!superoRecord && record > 0 && puntos > record) {
+        superoRecord = true;
+        textos.push({ x: W / 2, y: H / 2, t: '¡Nuevo récord!', vida: 3, grande: true });
+        bailar(3);
+      }
+      revisarPremios();
+    } else if (f.y > H + 20) {
+      fresas.splice(i, 1);
+      if (f.tipo === 'fresa') {
+        racha = 0; comboHasta = 0;
+        vidas--;
+        oso.triste = 1;
+        if (vidas > 0) { sonar('perder'); vibrar(70); }
+        textos.push({ x: f.x, y: H - 20, t: '💔', vida: 0.8 });
+        if (vidas <= 0) { oso.boca = 0; oso.bocado = 0; dibujar(); terminar(); return; }
+      }
+    }
+  }
+
+  actualizarEfectos(dt);
+  dibujar();
+  requestAnimationFrame(bucle);
+}
+
+function actualizarEfectos(dt) {
+  for (let i = particulas.length - 1; i >= 0; i--) {
+    const p = particulas[i];
+    p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 300 * dt; p.vida -= dt;
+    if (p.vida <= 0) particulas.splice(i, 1);
+  }
+  for (let i = textos.length - 1; i >= 0; i--) {
+    textos[i].y -= (textos[i].grande ? 15 : 40) * dt; textos[i].vida -= dt;
+    if (textos[i].vida <= 0) textos.splice(i, 1);
+  }
+}
+
+function dibujarFondo() {
+  // Estrellas que titilan
+  for (const e of ESTRELLAS) {
+    ctx.globalAlpha = 0.25 + 0.55 * Math.abs(Math.sin(reloj * 1.3 + e.f));
+    ctx.fillStyle = '#fff3e0';
+    ctx.beginPath(); ctx.arc(e.x, e.y * H, e.r, 0, Math.PI * 2); ctx.fill();
+  }
+  // Nubes que pasan despacio
+  ctx.globalAlpha = 0.06;
+  ctx.fillStyle = '#ffffff';
+  for (const n of NUBES) {
+    const x = ((n.x + reloj * n.v) % (W + 220)) - 110, y = n.y * H, s = n.s;
+    ctx.beginPath();
+    ctx.arc(x, y, 26 * s, 0, Math.PI * 2);
+    ctx.arc(x + 28 * s, y - 10 * s, 32 * s, 0, Math.PI * 2);
+    ctx.arc(x + 60 * s, y, 24 * s, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function dibujarGlobo() {
+  const g = oso.globo;
+  if (!g || g.vida <= 0) return;
+  ctx.save();
+  ctx.globalAlpha = Math.min(1, g.vida * 3);
+  ctx.font = 'bold 15px sans-serif';
+  const tw = ctx.measureText(g.texto).width + 20, th = 30;
+  const cx = oso.x + oso.w / 2;
+  let x = Math.max(6, Math.min(W - tw - 6, cx + 8));
+  const y = oso.y - 14 - (1 - Math.min(1, g.vida * 4)) * 0;
+  ctx.fillStyle = '#fff';
+  ctx.beginPath(); ctx.roundRect(x, y - th, tw, th, 14); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(cx + 4, y - 2); ctx.lineTo(cx + 18, y - 2); ctx.lineTo(cx + 4, y + 10); ctx.fill();
+  ctx.fillStyle = '#3a0d1f';
+  ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  ctx.fillText(g.texto, x + 10, y - th / 2 + 1);
+  ctx.restore();
+}
+
+function dibujar() {
+  ctx.clearRect(0, 0, W, H);
+  dibujarFondo();
+
+  // Suelo
+  ctx.fillStyle = '#2b2b2b';
+  ctx.fillRect(0, H - 14, W, 14);
+
+  // Fresas
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  for (const f of fresas) {
+    ctx.save();
+    ctx.translate(f.x, f.y);
+    ctx.rotate(Math.sin(f.giro) * 0.3);
+    if (f.tipo === 'dorada') { ctx.shadowColor = '#ffd166'; ctx.shadowBlur = 18; }
+    if (f.tipo === 'corazon') { ctx.shadowColor = '#ff4d6d'; ctx.shadowBlur = 16; ctx.scale(1 + Math.sin(f.giro * 4) * 0.12, 1 + Math.sin(f.giro * 4) * 0.12); }
+    ctx.font = (f.tipo === 'dorada' ? 38 : 32) + 'px sans-serif';
+    ctx.fillText(EMOJI_TIPO[f.tipo], 0, 0);
+    ctx.restore();
+  }
+
+  // Sombra
+  ctx.fillStyle = 'rgba(0,0,0,.35)';
+  ctx.beginPath();
+  ctx.ellipse(oso.x + oso.w / 2, H - 12, 34 - oso.mov * 6, 5, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  dibujarOso();
+  dibujarGlobo();
+
+  // Partículas
+  for (const p of particulas) {
+    ctx.globalAlpha = Math.max(0, p.vida / 0.6);
+    ctx.fillStyle = p.color;
+    ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  // Textos flotantes
+  for (const t of textos) {
+    ctx.globalAlpha = Math.min(1, t.vida * 2);
+    ctx.fillStyle = t.grande ? '#ffd166' : '#fff';
+    ctx.font = (t.grande ? 'bold 34px' : 'bold 22px') + ' sans-serif';
+    ctx.fillText(t.t, t.x, t.y);
+  }
+  ctx.globalAlpha = 1;
+
+  // Marcador
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 22px sans-serif';
+  ctx.fillText('🍓 ' + puntos, 16, 30);
+  ctx.font = '15px sans-serif';
+  ctx.fillStyle = '#E5C7AE';
+  ctx.fillText('🏆 Récord: ' + Math.max(record, puntos), 16, 56);
+
+  // Barra de progreso al siguiente premio
+  const sig = siguientePremio();
+  if (sig) {
+    const ant = PREMIOS[PREMIOS.indexOf(sig) - 1];
+    const desde = ant ? ant.meta : 0;
+    const prog = Math.max(0, Math.min(1, (puntos - desde) / (sig.meta - desde)));
+    const bx = 16, by = 70, bw = 150, bh = 10;
+    ctx.fillStyle = 'rgba(255,255,255,.12)';
+    ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 5); ctx.fill();
+    ctx.fillStyle = '#ffd166';
+    ctx.beginPath(); ctx.roundRect(bx, by, Math.max(bh, bw * prog), bh, 5); ctx.fill();
+    ctx.font = '14px sans-serif';
+    ctx.fillStyle = '#fff';
+    ctx.fillText(`${sig.emoji} faltan ${Math.max(0, sig.meta - puntos)}`, bx + bw + 8, by + 6);
+  }
+
+  // Combo activo
+  if (jugando && tiempo < comboHasta) {
+    ctx.font = 'bold 16px sans-serif';
+    ctx.fillStyle = '#ffb703';
+    ctx.fillText(`🔥 Combo x2 · ${Math.ceil(comboHasta - tiempo)}s`, 16, 100);
+  } else if (jugando && racha >= 10) {
+    ctx.font = '13px sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,.6)';
+    ctx.fillText(`🔥 racha ${racha}/20`, 16, 100);
+  }
+  ctx.textAlign = 'right';
+  ctx.font = '22px sans-serif';
+  ctx.fillText('❤️'.repeat(vidas) + '🖤'.repeat(3 - vidas), W - 14, 30);
+}
+
+// ---------- Animación del oso ----------
+function animarOso(dt, vx) {
+  oso.t += dt;
+  oso.vx += (vx - oso.vx) * Math.min(1, dt * 10);
+  const objetivoMov = Math.min(1, Math.abs(oso.vx) / 260);
+  oso.mov += (objetivoMov - oso.mov) * Math.min(1, dt * 8);
+  oso.fase += dt * (4 + oso.mov * 10) * (oso.mov > 0.05 ? 1 : 0);
+  const objIncl = Math.max(-0.22, Math.min(0.22, oso.vx / 1400));
+  oso.inclinacion += (objIncl - oso.inclinacion) * Math.min(1, dt * 8);
+  oso.bocado = Math.max(0, oso.bocado - dt * 2.5);
+  oso.triste = Math.max(0, oso.triste - dt * 1.2);
+  oso.asco = Math.max(0, oso.asco - dt * 1.1);
+  if (oso.globo) { oso.globo.vida -= dt; if (oso.globo.vida <= 0) oso.globo = null; }
+
+  // Parpadeo
+  oso.siguienteParpadeo -= dt;
+  if (oso.siguienteParpadeo <= 0) { oso.parpadeo = 0.16; oso.siguienteParpadeo = 2 + Math.random() * 3; }
+  oso.parpadeo = Math.max(0, oso.parpadeo - dt);
+
+  // Mira a la fresa más cercana y abre la boca si viene directo
+  const cx = oso.x + oso.w / 2, cy = oso.y + 40;
+  let cerca = null, dMin = Infinity;
+  for (const f of fresas) {
+    if (f.tipo === 'brocoli') continue;     // al brócoli no le abre la boca
+    const d = Math.hypot(f.x - cx, f.y - cy);
+    if (f.y < cy + 10 && d < dMin) { dMin = d; cerca = f; }
+  }
+  let mx = 0, my = 0, objBoca = 0;
+  if (cerca) {
+    mx = Math.max(-1, Math.min(1, (cerca.x - cx) / 120));
+    my = Math.max(-1, Math.min(1, (cerca.y - cy) / 160));
+    if (dMin < 150 && Math.abs(cerca.x - cx) < 60) objBoca = 1;
+  }
+  if (oso.bocado > 0) objBoca = 0.5 + 0.5 * Math.abs(Math.sin(oso.t * 22)); // mastica
+  if (oso.triste > 0.3 || oso.asco > 0.2) objBoca = 0;
+  if (oso.baile > 0) objBoca = 0.55 + 0.25 * Math.sin(oso.t * 9);   // canta mientras baila
+  oso.mirarX += (mx - oso.mirarX) * Math.min(1, dt * 10);
+  oso.mirarY += (my - oso.mirarY) * Math.min(1, dt * 10);
+  oso.boca += (objBoca - oso.boca) * Math.min(1, dt * 14);
+
+  // Polvito al correr
+  if (oso.mov > 0.7 && Math.random() < 0.3) {
+    particulas.push({
+      x: cx - Math.sign(oso.vx) * 25, y: H - 16,
+      vx: -Math.sign(oso.vx) * (30 + Math.random() * 40), vy: -20 - Math.random() * 30,
+      vida: 0.4, color: '#6b5a62'
+    });
+  }
+}
+
+const CONTORNO = '#4a1f33';   // café-morado suave en vez de negro
+function elipse(x, y, rx, ry, rot, relleno, grosor) {
+  ctx.beginPath();
+  ctx.ellipse(x, y, rx, ry, rot, 0, Math.PI * 2);
+  ctx.fillStyle = relleno; ctx.fill();
+  if (grosor) { ctx.lineWidth = grosor; ctx.strokeStyle = CONTORNO; ctx.stroke(); }
+}
+
+// Dibuja el oso por partes (mismas formas que tu SVG, coordenadas 400x500)
+function dibujarOso() {
+  const ROSA = '#BA2B5A', CREMA = '#E5C7AE', NARIZ = '#4B1E3F', CEJA = '#371B33';
+  const m = oso.mov, b = oso.bocado, fase = oso.fase;
+  const paso = Math.sin(fase);
+  const bl = oso.baile > 0 ? 1 : 0, ritmo = oso.t * 9;    // bailecito
+  const rebote = Math.abs(paso) * 14 * m + b * 10 + bl * Math.abs(Math.sin(ritmo)) * 24;
+  const respira = Math.sin(oso.t * 3) * 0.025 * (1 - m);
+  const sx = 1 + b * 0.10 - respira * 0.5;
+  const sy = 1 - b * 0.07 + respira;
+  const ESC = 0.24;
+
+  ctx.save();
+  ctx.translate(oso.x + oso.w / 2, oso.y + oso.h - 2);
+  ctx.rotate(oso.inclinacion + bl * Math.sin(ritmo) * 0.2);
+  ctx.scale(ESC * sx, ESC * sy);
+  ctx.translate(-200, -440);
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+
+  // Piernas (se levantan alternadas al caminar)
+  const piernaIzq = Math.max(0, paso) * 24 * m + bl * Math.max(0, Math.sin(ritmo)) * 22;
+  const piernaDer = Math.max(0, -paso) * 24 * m + bl * Math.max(0, -Math.sin(ritmo)) * 22;
+  ctx.save(); ctx.translate(0, -piernaIzq);
+  elipse(140, 390, 50, 50, 0, ROSA, 4); elipse(140, 395, 30, 20, 0, CREMA, 3);
+  ctx.restore();
+  ctx.save(); ctx.translate(0, -piernaDer);
+  elipse(260, 390, 50, 50, 0, ROSA, 4); elipse(260, 395, 30, 20, 0, CREMA, 3);
+  ctx.restore();
+
+  // Desde aquí todo el cuerpo rebota
+  ctx.translate(0, -rebote);
+
+  // Orejas (se mueven un poco)
+  const oreja = Math.sin(oso.t * 18) * 0.15 * b + paso * 0.06 * m;
+  ctx.save(); ctx.translate(150, 145); ctx.rotate(-oreja); ctx.translate(-150, -145);
+  elipse(130, 120, 35, 35, 0, ROSA, 4); ctx.restore();
+  ctx.save(); ctx.translate(250, 145); ctx.rotate(oreja); ctx.translate(-250, -145);
+  elipse(270, 120, 35, 35, 0, ROSA, 4); ctx.restore();
+
+  // Brazos (se balancean al caminar, se levantan al comer, caen si está triste)
+  const swing = paso * 0.45 * m;
+  // al bailar levanta los brazos y los mueve al ritmo
+  const brazoIzq = swing + b * 0.9 - oso.triste * 0.25 + bl * (1.7 + Math.sin(ritmo) * 0.5);
+  const brazoDer = swing - b * 0.9 + oso.triste * 0.25 - bl * (1.7 - Math.sin(ritmo) * 0.5);
+  ctx.save(); ctx.translate(135, 225); ctx.rotate(brazoIzq); ctx.translate(-135, -225);
+  elipse(90, 280, 35, 90, 35 * Math.PI / 180, ROSA, 4);
+  elipse(60, 330, 20, 30, 20 * Math.PI / 180, CREMA, 3);
+  ctx.restore();
+  ctx.save(); ctx.translate(265, 225); ctx.rotate(brazoDer); ctx.translate(-265, -225);
+  elipse(310, 280, 35, 90, -35 * Math.PI / 180, ROSA, 4);
+  elipse(340, 330, 20, 30, -20 * Math.PI / 180, CREMA, 3);
+  ctx.restore();
+
+  // Cuerpo y panza
+  elipse(200, 290, 110, 120, 0, ROSA, 4);
+  elipse(200, 310, 80, 90, 0, CREMA, 3);
+
+  // Cabeza (se balancea un poquito, con retraso)
+  ctx.save();
+  ctx.translate(200, 270);
+  ctx.rotate(-oso.inclinacion * 0.6 + Math.sin(fase + 0.6) * 0.04 * m - oso.triste * 0.06);
+  ctx.translate(-200, -270 + oso.triste * 8);
+
+  elipse(200, 190, 120, 100, 0, ROSA, 4);
+
+  // Cejas (se inclinan hacia arriba al estar triste)
+  // Cejas finas y amables, arriba de los ojos
+  const tr = oso.triste * 14;
+  ctx.strokeStyle = CEJA; ctx.lineWidth = 7;
+  ctx.beginPath(); ctx.moveTo(128, 132 + tr * 0.6); ctx.quadraticCurveTo(148, 118, 168, 128 - tr * 0.6); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(272, 132 + tr * 0.6); ctx.quadraticCurveTo(252, 118, 232, 128 - tr * 0.6); ctx.stroke();
+
+  // Hocico
+  elipse(200, 225, 85, 65, 0, CREMA, 3);
+
+  // Cachetes rosados
+  elipse(110, 214, 20, 12, 0, 'rgba(255,110,150,.55)');
+  elipse(290, 214, 20, 12, 0, 'rgba(255,110,150,.55)');
+
+  // Boca
+  const ab = oso.boca;
+  if (oso.asco > 0.2) {
+    // boca chueca con la lengua de fuera
+    elipse(212, 268, 13, 15, 0.2, '#ff7aa2', 3);
+    ctx.lineWidth = 4; ctx.strokeStyle = CONTORNO;
+    ctx.beginPath(); ctx.moveTo(165, 258);
+    ctx.quadraticCurveTo(180, 248, 195, 258); ctx.quadraticCurveTo(210, 268, 235, 254); ctx.stroke();
+  } else if (ab > 0.08) {
+    ctx.beginPath();
+    ctx.ellipse(200, 252, 34 + ab * 10, 6 + ab * 26, 0, 0, Math.PI * 2);
+    ctx.fillStyle = '#3a0d1f'; ctx.fill();
+    ctx.lineWidth = 4; ctx.strokeStyle = CONTORNO; ctx.stroke();
+    ctx.save(); ctx.clip();
+    elipse(200, 262 + ab * 14, 26, 14, 0, ROSA);
+    ctx.restore();
+  } else if (oso.triste > 0.05) {
+    ctx.lineWidth = 4; ctx.strokeStyle = CONTORNO;
+    ctx.beginPath(); ctx.moveTo(160, 265); ctx.quadraticCurveTo(200, 240 - oso.triste * 10, 240, 265); ctx.stroke();
+  } else {
+    ctx.lineWidth = 4; ctx.strokeStyle = CONTORNO;
+    ctx.beginPath(); ctx.moveTo(150, 240); ctx.quadraticCurveTo(200, 300, 250, 240); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(165, 255); ctx.quadraticCurveTo(200, 280, 235, 255); ctx.closePath();
+    ctx.fillStyle = ROSA; ctx.fill(); ctx.lineWidth = 3; ctx.stroke();
+  }
+
+  // Nariz
+  elipse(200, 204, 36, 24, 0, NARIZ, 3);
+  ctx.fillStyle = 'rgba(255,255,255,.35)';
+  ctx.beginPath(); ctx.ellipse(188, 197, 10, 5, -0.3, 0, Math.PI * 2); ctx.fill();
+
+  // Ojos (parpadean y siguen a la fresa)
+  // Ojos grandes y brillantes (estilo tierno); al parpadear se vuelven una curvita
+  const px = oso.mirarX * 4, py = oso.mirarY * 3;
+  for (const ex of [152, 248]) {
+    if (bl) {
+      // ojos felices ^ ^
+      ctx.strokeStyle = CONTORNO; ctx.lineWidth = 6;
+      ctx.beginPath(); ctx.arc(ex, 176, 15, 1.15 * Math.PI, 1.85 * Math.PI); ctx.stroke();
+    } else if (oso.asco > 0.2) {
+      // ojos apretados > <
+      const s = ex < 200 ? 1 : -1;
+      ctx.strokeStyle = CONTORNO; ctx.lineWidth = 6;
+      ctx.beginPath(); ctx.moveTo(ex - 12 * s, 156); ctx.lineTo(ex + 10 * s, 166); ctx.lineTo(ex - 12 * s, 176); ctx.stroke();
+    } else if (oso.parpadeo > 0) {
+      ctx.strokeStyle = CONTORNO; ctx.lineWidth = 5;
+      ctx.beginPath(); ctx.arc(ex, 160, 15, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke();
+    } else {
+      elipse(ex, 166, 19, 21, 0, '#fff', 3);
+      elipse(ex + px, 168 + py, 14, 16, 0, '#2a0f1c');
+      elipse(ex + px - 5, 161 + py, 5.5, 5.5, 0, '#fff');
+      elipse(ex + px + 5, 174 + py, 2.5, 2.5, 0, '#fff');
+    }
+  }
+  // Lagrimita cuando está triste
+  if (oso.triste > 0.2) {
+    ctx.globalAlpha = oso.triste;
+    elipse(134, 194 + (1 - oso.triste) * 40, 6, 9, 0, '#7fc8ff');
+    ctx.globalAlpha = 1;
+  }
+  ctx.restore(); // cabeza
+
+  ctx.restore();
+}
+
+pintarBotonSonido();
+$('btnSonido').addEventListener('click', e => {
+  e.stopPropagation();
+  mudo = !mudo;
+  try { localStorage.setItem(CLAVE_MUDO, mudo ? '1' : '0'); } catch {}
+  pintarBotonSonido();
+  if (mudo) musicaOff(false); else if (jugando) musicaOn();
+  e.currentTarget.blur();
+});
+
+$('btnJugar').addEventListener('click', iniciar);
+$('btnOtra').addEventListener('click', iniciar);
+addEventListener('keydown', e => {
+  if ((e.key === 'Enter' || e.key === ' ') && !jugando) { e.preventDefault(); iniciar(); }
+  else if ((e.key === 'p' || e.key === 'Escape') && jugando) { pausado ? seguir() : pausar(); }
+});
+$('btnPausa').addEventListener('click', e => { e.currentTarget.blur(); pausar(); });
+$('btnSeguir').addEventListener('click', seguir);
+$('btnPremio').addEventListener('click', cerrarPremio);
+pintarListaPremios('listaPremiosInicio');
+$('pausa').addEventListener('click', e => { if (e.target === $('pausa')) seguir(); });
+addEventListener('load', ajustarTamano);
+ajustarTamano();
+osoImg.onload = dibujar;
+</script>
+</body>
+</html>
